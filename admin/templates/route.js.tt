@@ -1,0 +1,54 @@
+export default {
+  path: '',
+  component: {
+    template: '<router-view :key="$route.fullPath" />'
+  },
+  children: [
+<% if index_api_route %>
+    {
+      path: '/<%= collection_name %>',
+      name: '<%= collection_name %>.index',
+      component: require('./index').default,
+      meta: {
+        title: '<%= resource_class.name.pluralize %>',
+        navbar: 'el-icon-picture-outline',
+        permission: '<%= collection_name %>.read'
+      }
+    },
+<% end %>
+<% if create_api_route %>
+    {
+      path: '/<%= collection_name %>/new',
+      name: '<%= collection_name %>.new',
+      component: require('./new').default,
+      meta: {
+        title: 'New <%= resource_class.name %>',
+        permission: '<%= collection_name %>.create'
+      }
+    },
+<% end %>
+<% if show_api_route %>
+    {
+      path: '/<%= collection_name %>/:id',
+      name: '<%= collection_name %>.show',
+      component: require('./show').default,
+      meta: {
+        title: '<%= resource_class.name %> Detail',
+        permission: '<%= collection_name %>.read'
+      }
+    },
+<% end %>
+<% if update_api_route %>
+    {
+      path: '/<%= collection_name %>/:id/edit',
+      name: '<%= collection_name %>.edit',
+      component: require('./edit').default,
+      meta: {
+        title: 'Edit <%= resource_class.name %>',
+        permission: '<%= collection_name %>.update'
+      }
+    }
+<% end %>
+  ]
+}
+

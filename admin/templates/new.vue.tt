@@ -1,0 +1,32 @@
+<template>
+  <div class="page">
+    <c-source-form
+      :columns="columns"
+      :data="data"
+      @submit="handleCreate"
+    />
+  </div>
+</template>
+
+<script>
+import { Vue, Component } from 'vue-property-decorator';
+import createColumns from './columns';
+
+@Component
+export default class <%= resource_class.name %>New extends Vue {
+
+  data = {}
+
+  get columns() {
+    return createColumns.call(this);
+  }
+
+  async handleCreate(data) {
+    const { id } = await this.$autoLoading(
+      this.$request.post('/<%= collection_name %>', data)
+    );
+    this.$message.success('Create successfully.');
+    this.$router.push({ name: '<%= collection_name %>.show', params: { id } });
+  }
+}
+</script>

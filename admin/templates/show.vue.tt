@@ -1,0 +1,33 @@
+<template>
+  <div class="page">
+    <c-source-detail
+      :columns="columns"
+      :data="data"
+      resource="<%= collection_name %>"
+    />
+  </div>
+</template>
+
+<script>
+import { Vue, Component } from 'vue-property-decorator';
+import createColumns from './columns';
+
+@Component
+export default class <%= resource_class.name %>Show extends Vue {
+  data = {}
+
+  get columns() {
+    return createColumns.call(this, {
+      actionColumn: { detail: false }
+    })
+  }
+
+  mounted() {
+    this.fetchData();
+  }
+
+  async fetchData() {
+    this.data = await this.$request.get(`/<%= collection_name %>/${this.$route.params.id}`);
+  }
+}
+</script>

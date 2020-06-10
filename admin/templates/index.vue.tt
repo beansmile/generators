@@ -1,0 +1,45 @@
+<template>
+  <div class="page">
+    <c-source-page
+      :table="table"
+      :columns="columns"
+      :filter="filter"
+      :pagination="pagination"
+      resource="<%= collection_name %>"
+<% if create_api_route %>
+      createButtonText="New <%= resource_class.name %>"
+<% end %>
+    />
+  </div>
+</template>
+
+<script>
+import { Vue, Component } from 'vue-property-decorator';
+import createColumns from './columns';
+
+@Component
+export default class <%= resource_class.name.pluralize %> extends Vue {
+
+  pagination = {}
+
+  filter = <%= filter_array %>
+
+  table = {
+    data: []
+  };
+
+  get columns() {
+    return createColumns.call(this)
+  }
+
+  async mounted() {
+    this.fetchData();
+  }
+
+  async fetchData(params = {}) {
+    const { data, pagination } = await this.$request.get('/<%= collection_name %>', { params: { ...this.$route.query, ...params } });
+    this.table.data = data;
+    this.pagination = pagination;
+  }
+}
+</script>
