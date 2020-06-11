@@ -46,8 +46,19 @@ module Generators::Admin
 
       把下面的内容复制到src/router.js的routes变量里
       require('@/views/#{collection_name}/route').default
-      #########################################################################
+
+      把下面的内容复制到src/constants.js
       FILE
+
+      (filter_data + form_columns_data).select { |data| data[:form_component] == "enum" }.map { |data| data[:attribute] }.uniq.each do |attribute|
+        puts "export const #{resource_class.name.upcase}_#{attribute.pluralize.upcase} = {"
+        resource_class.send(attribute.pluralize).keys.each do |key|
+          puts "  #{key}: '#{resource_class.human_attribute_name("#{attribute}.#{key}")}',"
+        end
+        puts "}"
+        puts ""
+      end
+      puts "#########################################################################"
     end
 
     private
@@ -95,16 +106,12 @@ module Generators::Admin
       @resource_detail_entity ||= "#{namespace_classify}::API::Entities::#{resource_class}Detail".constantize
     end
 
-    def filter_array
-      return unless index_api_route
+    def filter_data
+      return @filter_data if @filter_data
 
-      filter_data = index_api_route.settings[:description][:params].delete_if { |k, v| k.in?(["page", "per_page", "offset", "order_by"]) }
+      @filter_data = []
 
-      return [] if filter_data.size == 0
-
-      data_array = []
-
-      filter_data.each do |key, options|
+      index_api_route.settings[:description][:params].delete_if { |k, v| k.in?(["page", "per_page", "offset", "order_by"]) }.each do |key, options|
         # TODO 找出更好的方法能处理通过title_cont解释得到title的方法
         condition = resource_class.ransack(key => 1).conditions[0]
 
@@ -115,26 +122,39 @@ module Generators::Admin
         next unless column = resource_class.columns.detect { |column| column.name == attribute.to_s }
         attribute_type = column.sql_type_metadata.type
 
-        form_component = case attribute_type
-                         when :boolean
-                           "select"
+        form_component = if resource_class.defined_enums[attribute]
+                           "enum"
                          else
-                           "input"
+                           case attribute_type
+                           when :boolean
+                             "select"
+                           else
+                             "input"
+                           end
                          end
 
-        data_array << {
-          prop: key,
+        @filter_data << {
+          prop: key.to_s,
+          attribute: attribute,
           label: resource_class.human_attribute_name(attribute),
           attribute_type: attribute_type,
           render_form: true,
-          form_component: form_component
+          form_component: form_component,
+          type: "filter"
         }
       end
+
+
+      @filter_data
+    end
+
+    def filter_array
+      return unless index_api_route
 
       array = []
       array << "["
 
-      data_array.each do |data|
+      filter_data.each do |data|
         array << add_column(data)
       end
 
@@ -143,14 +163,37 @@ module Generators::Admin
       array.join("\n")
     end
 
-    def columns_array
-      data_array = []
+    def index_import
+      array = filter_data.select { |data| data[:form_component] == "enum" }
 
-      data_array << {
-        prop: :id,
+      return if array.blank?
+
+      [
+        "import { #{array.map { |data| "#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}" }.join(", ")} } from '@/constants';",
+        "import _ from 'lodash';"
+      ].join("\n")
+    end
+
+    def columns_import
+      array = form_columns_data.select { |data| data[:form_component] == "enum" }
+
+      return if array.blank?
+
+      "import { #{array.map { |data| "#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}" }.join(", ")} } from '@/constants';"
+    end
+
+    def form_columns_data
+      return @form_columns_data if @form_columns_data
+
+      @form_columns_data = []
+
+      @form_columns_data << {
+        prop: "id",
+        attribute: "id",
         label: resource_class.human_attribute_name(:id),
         sort: true,
-        width: 80
+        width: 80,
+        type: "column"
       }
 
       resource_detail_entity.documentation.each do |attribute, _|
@@ -164,7 +207,9 @@ module Generators::Admin
 
         form_component, render_cell_component = if attribute == :email
                                                   ["email", nil]
-                                                elsif attribute.in?([:avatar, :cover, :image])
+                                                elsif resource_class.defined_enums[attribute.to_s]
+                                                  ["enum", "enum"]
+                                                elsif attribute.in?([:avatar, :cover, :image, :images])
                                                   ["upload", "image"]
                                                 else
                                                   case attribute_type
@@ -193,32 +238,40 @@ module Generators::Admin
                           false
                         end
 
-        data_array << {
-          prop: attribute,
+        @form_columns_data << {
+          prop: attribute.to_s,
+          attribute: attribute.to_s,
           label: resource_class.human_attribute_name(attribute),
           sort: sort,
           render_form: render_form,
           required: render_form ? create_or_update_api_route.settings[:description][:params][attribute.to_s][:required] : false,
           form_component: form_component,
           hide_in_table: hide_in_table,
-          render_cell_component: render_cell_component
+          render_cell_component: render_cell_component,
+          type: "column"
         }
       end
 
-      [:created_at, :updated_at].each do |attribute|
-        data_array << {
+      ["created_at", "updated_at"].each do |attribute|
+        @form_columns_data << {
           prop: attribute,
+          attribute: attribute,
           label: resource_class.human_attribute_name(attribute),
           hide_in_table: true,
-          render_cell_component: "time"
+          render_cell_component: "time",
+          type: "column"
         }
       end
 
+      @form_columns_data
+    end
+
+    def columns_array
       array = []
       array << "["
 
 
-      data_array.each do |data|
+      form_columns_data.each do |data|
         array << add_column(data)
       end
 
@@ -345,13 +398,35 @@ module Generators::Admin
       FILE
     end
 
+    def enum_form(data)
+      <<~FILE
+      {
+        component: 'select',
+        props: {
+          clearable: #{data[:type] == "filter"},
+          options: _.map(#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}, (label, value) => ({ label, value }))
+        }
+      }
+      FILE
+    end
+
     def textarea_render_cell(data)
       <<~FILE
       {
         if (!row.#{data[:prop]}) {
           return '/'
         }
-        return <span style="white-space: pre-wrap; word-break: break-all">{row.#{data[:prop]}}</span>
+        return <span style="white-space: pre-wrap; word-break: break-all">{row.#{data[:attribute]}}</span>
+      }
+      FILE
+    end
+
+    def enum_render_cell(data)
+      <<~FILE
+      {
+        // TODO 调整标签类型
+        const type = ['warning', 'success', 'danger', 'info'][Object.keys(#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}).indexOf(row.#{data[:attribute]})];
+        return <el-tag type={type}>{#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}[row.#{data[:attribute]}]}</el-tag>;
       }
       FILE
     end
