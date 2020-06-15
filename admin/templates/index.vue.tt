@@ -7,7 +7,7 @@
       :pagination="pagination"
       resource="<%= collection_name %>"
 <% if create_api_route %>
-      createButtonText="New <%= resource_class.name %>"
+      createButtonText="New <%= resource_class.name.titleize %>"
 <% end %>
     />
   </div>

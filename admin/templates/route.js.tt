@@ -10,7 +10,7 @@ export default {
       name: '<%= collection_name %>.index',
       component: require('./index').default,
       meta: {
-        title: '<%= resource_class.name.pluralize %>',
+        title: '<%= resource_class.name.pluralize.titleize %>',
         navbar: 'el-icon-picture-outline',
         permission: '<%= collection_name %>.read'
       }
@@ -22,7 +22,7 @@ export default {
       name: '<%= collection_name %>.new',
       component: require('./new').default,
       meta: {
-        title: 'New <%= resource_class.name %>',
+        title: 'New <%= resource_class.name.titleize %>',
         permission: '<%= collection_name %>.create'
       }
     },
@@ -33,7 +33,7 @@ export default {
       name: '<%= collection_name %>.show',
       component: require('./show').default,
       meta: {
-        title: '<%= resource_class.name %> Detail',
+        title: '<%= resource_class.name.titleize %> Detail',
         permission: '<%= collection_name %>.read'
       }
     },
@@ -44,7 +44,7 @@ export default {
       name: '<%= collection_name %>.edit',
       component: require('./edit').default,
       meta: {
-        title: 'Edit <%= resource_class.name %>',
+        title: 'Edit <%= resource_class.name.titleize %>',
         permission: '<%= collection_name %>.update'
       }
     }
