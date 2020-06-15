@@ -1,5 +1,7 @@
 module Generators::Admin
   class ViewGenerator < Rails::Generators::NamedBase
+    RELATION_DISPLAY_COLUMN_NAME = ["name", "title", "label", "nickname", "id"]
+
     source_root File.expand_path('templates', __dir__)
 
     def set_i18n
@@ -175,11 +177,13 @@ module Generators::Admin
     end
 
     def columns_import
-      array = form_columns_data.select { |data| data[:form_component] == "enum" }
+      array = []
+      enum_data_array = form_columns_data.select { |data| data[:form_component] == "enum" }
 
-      return if array.blank?
+      array << "import { #{enum_data_array.map { |data| "#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}" }.join(", ")} } from '@/constants';" if enum_data_array.any?
+      array << "import { permissionService } from 'beans-admin-plugin';" if form_columns_data.any? { |data| data[:form_component] == "belongs_to" }
 
-      "import { #{array.map { |data| "#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}" }.join(", ")} } from '@/constants';"
+      array.join("\n")
     end
 
     def form_columns_data
@@ -202,6 +206,8 @@ module Generators::Admin
         # TODO 暂时只处理属于model自身的属性，不处理关联关系
         next unless column = resource_class.columns.detect { |column| column.name == attribute.to_s }
 
+        belongs_to_relations = resource_class.reflect_on_all_associations(:belongs_to).inject({}) { |hash, r| hash[r.foreign_key] = r; hash }
+
         create_or_update_api_route = create_api_route || update_api_route
         attribute_type = column.sql_type_metadata.type
 
@@ -209,6 +215,8 @@ module Generators::Admin
                                                   ["email", nil]
                                                 elsif resource_class.defined_enums[attribute.to_s]
                                                   ["enum", "enum"]
+                                                elsif belongs_to_relation = belongs_to_relations[attribute.to_s]
+                                                  ["belongs_to", "belongs_to"]
                                                 elsif attribute.in?([:avatar, :cover, :image, :images])
                                                   ["upload", "image"]
                                                 else
@@ -226,7 +234,7 @@ module Generators::Admin
 
         render_form = create_or_update_api_route ? create_or_update_api_route.settings[:description][:params].try(:[], attribute.to_s)&.present? : false
 
-        sort = if render_cell_component.in?(["textarea", "image"])
+        sort = if render_cell_component.in?(["textarea", "image", "belongs_to"])
                  false
                else
                  true
@@ -248,7 +256,8 @@ module Generators::Admin
           form_component: form_component,
           hide_in_table: hide_in_table,
           render_cell_component: render_cell_component,
-          type: "column"
+          type: "column",
+          belongs_to_relation: belongs_to_relation
         }
       end
 
@@ -380,7 +389,8 @@ module Generators::Admin
       {
         component: 'upload',
         props: {
-          size: 1,
+          size: 5,
+          limit: #{data[:attribute] == data[:attribute].pluralize ? 9 : 1},
           hint: 'Suggest size: 100x100'
         }
       }
@@ -410,10 +420,34 @@ module Generators::Admin
       FILE
     end
 
+    def belongs_to_form(data)
+      display_column_name = RELATION_DISPLAY_COLUMN_NAME.detect do |name|
+        name.in?(data[:belongs_to_relation].klass.columns.map(&:name))
+      end
+      belongs_to_model = data[:belongs_to_relation].klass
+
+      <<~FILE
+      {
+        component: 'select',
+        props: {
+         xRemotePreload: async () => {
+            const { data } = await this.$request.get('/#{belongs_to_model.name.underscore.pluralize}', { params: { per_page: 100 } });
+            return data.map(({ id, #{display_column_name} }) => ({ value: id, label: #{display_column_name} }))
+          },
+          xRemoteSearch: async (keyword) => {
+            const params = { #{display_column_name}_cont: keyword };
+            const { data } = await this.$request.get('/#{belongs_to_model.name.underscore.pluralize}', { params });
+            return data.map(item => ({ value: item.id, label: item.#{display_column_name} }));
+          }
+        }
+      }
+      FILE
+    end
+
     def textarea_render_cell(data)
       <<~FILE
       {
-        if (!row.#{data[:prop]}) {
+        if (!row.#{data[:attribute]}) {
           return '/'
         }
         return <span style="white-space: pre-wrap; word-break: break-all">{row.#{data[:attribute]}}</span>
@@ -427,6 +461,28 @@ module Generators::Admin
         // TODO 调整标签类型
         const type = ['warning', 'success', 'danger', 'info'][Object.keys(#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}).indexOf(row.#{data[:attribute]})];
         return <el-tag type={type}>{#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}[row.#{data[:attribute]}]}</el-tag>;
+      }
+      FILE
+    end
+
+    def belongs_to_render_cell(data)
+      display_column_name = RELATION_DISPLAY_COLUMN_NAME.detect do |name|
+        name.in?(data[:belongs_to_relation].klass.columns.map(&:name))
+      end
+      belongs_to_model = data[:belongs_to_relation].klass
+
+      <<~FILE
+      {
+        if (row.#{data[:attribute]}) {
+          const name = row.#{data[:belongs_to_relation].name}.#{display_column_name}
+          if (permissionService.hasPermission('#{belongs_to_model.name.underscore.pluralize}.read')) {
+            return <c-link-button to={{ name: '#{belongs_to_model.name.underscore.pluralize}.show', params: { id: row.#{data[:belongs_to_relation].foreign_key} } }}>{name}</c-link-button>
+          } else {
+            return name
+          }
+        } else {
+          return '/'
+        }
       }
       FILE
     end
