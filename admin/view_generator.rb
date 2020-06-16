@@ -53,7 +53,7 @@ module Generators::Admin
       FILE
 
       (filter_data + form_columns_data).select { |data| data[:form_component] == "enum" }.map { |data| data[:attribute] }.uniq.each do |attribute|
-        puts "export const #{resource_class.name.upcase}_#{attribute.pluralize.upcase} = {"
+        puts "export const #{resource_class.name.underscore.upcase}_#{attribute.pluralize.upcase} = {"
         resource_class.send(attribute.pluralize).keys.each do |key|
           puts "  #{key}: '#{resource_class.human_attribute_name("#{attribute}.#{key}")}',"
         end
@@ -171,7 +171,7 @@ module Generators::Admin
       return if array.blank?
 
       [
-        "import { #{array.map { |data| "#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}" }.join(", ")} } from '@/constants';",
+        "import { #{array.map { |data| "#{resource_class.name.underscore.upcase}_#{data[:attribute].pluralize.upcase}" }.join(", ")} } from '@/constants';",
         "import _ from 'lodash';"
       ].join("\n")
     end
@@ -180,7 +180,7 @@ module Generators::Admin
       array = []
       enum_data_array = form_columns_data.select { |data| data[:form_component] == "enum" }
 
-      array << "import { #{enum_data_array.map { |data| "#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}" }.join(", ")} } from '@/constants';" if enum_data_array.any?
+      array << "import { #{enum_data_array.map { |data| "#{resource_class.name.underscore.upcase}_#{data[:attribute].pluralize.upcase}" }.join(", ")} } from '@/constants';" if enum_data_array.any?
       array << "import { permissionService } from 'beans-admin-plugin';" if form_columns_data.any? { |data| data[:form_component] == "belongs_to" }
 
       array.join("\n")
@@ -414,7 +414,7 @@ module Generators::Admin
         component: 'select',
         props: {
           clearable: #{data[:type] == "filter"},
-          options: _.map(#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}, (label, value) => ({ label, value }))
+          options: _.map(#{resource_class.name.underscore.upcase}_#{data[:attribute].pluralize.upcase}, (label, value) => ({ label, value }))
         }
       }
       FILE
@@ -459,8 +459,8 @@ module Generators::Admin
       <<~FILE
       {
         // TODO 调整标签类型
-        const type = ['warning', 'success', 'danger', 'info'][Object.keys(#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}).indexOf(row.#{data[:attribute]})];
-        return <el-tag type={type}>{#{resource_class.name.upcase}_#{data[:attribute].pluralize.upcase}[row.#{data[:attribute]}]}</el-tag>;
+        const type = ['warning', 'success', 'danger', 'info'][Object.keys(#{resource_class.name.underscore.upcase}_#{data[:attribute].pluralize.upcase}).indexOf(row.#{data[:attribute]})];
+        return <el-tag type={type}>{#{resource_class.name.underscore.upcase}_#{data[:attribute].pluralize.upcase}[row.#{data[:attribute]}]}</el-tag>;
       }
       FILE
     end
