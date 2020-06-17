@@ -4,4 +4,4 @@
 git clone https://github.com/beansmile/generators.git
 ```
 
-* [AdminView使用方法](https://github.com/beansmile/generators/blob/master/admin/USAGE.md)
+* [AdminView使用方法](https://github.com/beansmile/generators/blob/master/admin_view/USAGE.md)
