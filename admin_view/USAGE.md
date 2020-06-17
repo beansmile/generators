@@ -1,5 +1,5 @@
 ## How to use
-`rails generate generators:admin:view MODEL`
+`rails generate admin_view MODEL`
 
 ## Preconditions
 
@@ -10,7 +10,7 @@
 
 ## What will be done
 
-`rails generate generators:admin:view user`
+`rails generate admin_view user`
 
 ### 根据AdminAPI::API::V1::Users的CRUD API生成对应的route和页面
 
